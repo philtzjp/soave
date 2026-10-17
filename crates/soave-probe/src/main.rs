@@ -35,27 +35,33 @@ fn play() -> ExitCode {
     let mut seconds = 3.0_f32;
     let mut device_index = 0_usize;
     let mut routes: Vec<Route> = vec![];
-    let args: Vec<String> = std::env::args().skip(2).collect();
-    let mut flag = false;
-    for arg in &args {
-        if let Some(rest) = arg.strip_prefix("--device ") {
-            match rest.parse() {
-                Ok(n) => device_index = n,
-                Err(_) => return fail(&format!("--device は番号です: {rest}")),
+    let mut args = std::env::args().skip(2);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--device" => {
+                let Some(value) = args.next() else {
+                    return fail("--device の次にデバイスの番号を置いてください");
+                };
+                match value.parse() {
+                    Ok(n) => device_index = n,
+                    Err(_) => return fail(&format!("--device は番号です: {value}")),
+                }
             }
-        } else if let Some(rest) = arg.strip_prefix("--route ") {
-            match parse_route(rest) {
-                Some(route) => routes.push(route),
-                None => return fail(&format!("--route は bus.チャンネル:出力 の形です: {rest}")),
+            "--route" => {
+                let Some(value) = args.next() else {
+                    return fail("--route の次に bus.チャンネル:出力 を置いてください");
+                };
+                match parse_route(&value) {
+                    Some(route) => routes.push(route),
+                    None => {
+                        return fail(&format!("--route は bus.チャンネル:出力 の形です: {value}"));
+                    }
+                }
             }
-        } else if let Some(rest) = arg.strip_prefix("--") {
-            let _ = rest;
-            flag = true;
-        } else if !flag {
-            match arg.parse() {
+            _ => match arg.parse() {
                 Ok(value) => seconds = value,
                 Err(_) => return fail(&format!("秒は数値です: {arg}")),
-            }
+            },
         }
     }
     if routes.is_empty() {
@@ -74,8 +80,12 @@ fn play() -> ExitCode {
             "デバイス {device_index} は出力チャンネルを持てません"
         ));
     }
+    let name = output_devices()
+        .get(device_index)
+        .map(|info| info.name.clone())
+        .unwrap_or_else(|| "名前の取れないデバイス".to_string());
     let routing = Routing::new(routes, channels);
-    println!("デバイス {device_index} で {seconds} 秒、{channels} チャンネルに経路します");
+    println!("デバイス {device_index}: {name} で {seconds} 秒、{channels} チャンネルに経路します");
     match daw_audio::engine::play(&device, routing, seconds) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => fail(&format!("再生に失敗しました: {error}")),
