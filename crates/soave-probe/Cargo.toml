@@ -1,0 +1,11 @@
+[package]
+name = "soave-probe"
+description = "soave の縦貫を確かめるための検証コマンド"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+daw-audio = { path = "../daw-audio" }
